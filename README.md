@@ -11,12 +11,18 @@
 .
 ├── README.md                     # 개요 + 평가문항 ↔ 제출물 매핑표
 ├── 01_task_definition.md         # 업무 과업 정의, 타겟 사용자, 입력/출력 규격, 입력 템플릿
-├── 02_model_comparison.md        # 3종 모델 비교표(평가 축 5개 + 점수 + 근거), 선정 이유
-├── 03_prompt_design.md           # 시스템/유저/입력 템플릿 분리, 페르소나, v1→v2→v3 개선, Few-shot 4개
+├── 02_model_comparison.md        # 3종 모델 비교표(평가 축 5개 + 점수 + 근거), 선정 이유, Claude Opus/Sonnet/Haiku 티어 비교
+├── 03_prompt_design.md           # 시스템/유저/입력 템플릿 분리, 배치 순서 원칙, v1→v2→v3 개선, 카테고리별 Few-shot 6개
 ├── 04_hallucination_test.md      # 환각 정의, Pass(A/B)/Fail 기준, 검증 질문 7개 + 판정 결과
 ├── 05_conversation_log.md        # 12턴 대화 로그(중간 조건 변경 2회 반영 확인)
 ├── 06_interview_answers.md       # 핵심 원리 설명(항목 3) + 심층 인터뷰 답변(항목 4)
-└── 07_bonus.md                   # 보너스: 규정 그라운딩(RAG형) 설계 + 자동 회귀 테스트 시트
+├── 07_bonus.md                   # 보너스: 규정 그라운딩(RAG형) 설계 + 회귀 테스트 시트 + 자동 검증기
+├── templates/
+│   ├── input_template.md         # 복사용 입력 템플릿 A/B/C (C = 수치 빈칸 모드)
+│   └── policy_sheet.md           # 규정 시트 (버전·시행일·개정 이력 관리)
+└── bonus/
+    ├── validate_output.py        # 형식·채널·조항·금액·금지 표현 자동 검사
+    └── samples/                  # 검사용 샘플 답변 3종
 ```
 
 ## 선택한 업무 과업 (한 줄 요약)
@@ -32,6 +38,7 @@
 | 비교 모델 | Claude, ChatGPT, Gemini (웹 UI 기본 요금제) |
 | 평가 축 | 규정 근거 정확성 / 확인 필요 표시(환각 억제) / 출력 형식 준수 / 고객 응대 톤 / 되묻기 적절성 (5개, 각 1~5점) |
 | 최종 선정 | **Claude** (단순 합계 22/25, 가중 합계 32/35) |
+| Claude 티어 | 일상 초안 **Sonnet** / 분쟁·복합 문의 **Opus** / 문의 분류 **Haiku** (02 문서 6장) |
 
 선정 이유: 이 과업은 "그럴듯한 문장"보다 **"규정에 없는 내용을 지어내지 않는 것"**이
 가장 중요하다. 가중치 2배를 둔 `규정 근거 정확성`·`확인 필요 표시` 두 축에서
@@ -42,9 +49,9 @@ Claude가 최고점이었다. 상세 근거는 `02_model_comparison.md` 참고.
 | 평가 항목 | 문항 | 위치 |
 |---|---|---|
 | 1. 기능 동작 검증 | 1-1 업무 과업 정의(타겟/입력/출력) | `01_task_definition.md` 1~4장 |
-| | 1-2 복사 가능한 입력 템플릿 | `01_task_definition.md` 5장 (템플릿 A/B 2종) |
-| | 1-3 3종 모델 비교표(축 4개↑+점수+근거) | `02_model_comparison.md` 3~4장 |
-| | 1-4 Few-shot 3개↑ (모호한 입력→되묻기 포함) | `03_prompt_design.md` 5장 (예시 4개, 예시 2가 되묻기) |
+| | 1-2 복사 가능한 입력 템플릿 | `01_task_definition.md` 5장, `templates/input_template.md` (템플릿 A/B/C 3종) |
+| | 1-3 3종 모델 비교표(축 4개↑+점수+근거) | `02_model_comparison.md` 3~4장 (타사 3종), 6장 (Claude Opus/Sonnet/Haiku) |
+| | 1-4 Few-shot 3개↑ (모호한 입력→되묻기 포함) | `03_prompt_design.md` 5장 (카테고리 맵 + 예시 6개, 예시 2가 되묻기) |
 | | 1-5 환각 검증 질문 5개↑ + Pass/Fail | `04_hallucination_test.md` 3~4장 (7개) |
 | | 1-6 10턴↑ 대화 + 중간 조건 변경 반영 | `05_conversation_log.md` (12턴, Turn 5·9 조건 변경) |
 | 2. 동작 구조 및 설계 | 2-1 시스템/유저/입력 템플릿 분리 | `03_prompt_design.md` 1~3장 |
@@ -56,7 +63,20 @@ Claude가 최고점이었다. 상세 근거는 `02_model_comparison.md` 참고.
 | 4. 심층 인터뷰 | 4-1 무료 모델만 쓸 때 | `06_interview_answers.md` Q4 |
 | | 4-2 정책이 자주 바뀔 때 | `06_interview_answers.md` Q5 |
 | | 4-3 10턴↑ 문맥 끊김 | `06_interview_answers.md` Q6 |
-| 5. 보너스 | 규정 그라운딩 + 자동 회귀 테스트 | `07_bonus.md` |
+| | (보강) 입력·출력 규격화로 환각 바로잡기 | `04_hallucination_test.md` 5장 |
+| 5. 보너스 | 규정 그라운딩 + 회귀 테스트 + 자동 검증기 | `07_bonus.md`, `bonus/validate_output.py` |
+
+## 피드백 반영 보완 사항
+
+| 보완 포인트 | 반영 내용 | 위치 |
+|---|---|---|
+| 같은 회사 모델 티어 비교 | 유료로 쓰는 Claude Opus / Sonnet / Haiku를 동일 테스트로 비교, 업무 단계별 추천(일상 Sonnet, 분쟁·복합 Opus, 분류 Haiku) | `02_model_comparison.md` 6장 |
+| Few-shot 카테고리 정리 | 문의 유형 4종 × 판단 유형 6종 카테고리 맵, 예시 4개 → 6개(결석 기한, 연기 거절 추가) | `03_prompt_design.md` 5장 |
+| 입력·출력 규격화로 환각 교정 | 환각 유형별 입력 필드 대응표 + ①②③ 출력 칸의 역할 정리 | `04_hallucination_test.md` 5장 |
+| 무료 모델 — 세션을 짧게 | 컨텍스트 압축 대비 1문의 1세션, 5턴 상한, 압축 징후 시 재시작 | `06_interview_answers.md` Q4 |
+| 수치는 사람이, LLM은 틀만 | 템플릿 C(수치 빈칸 모드) + `[수강 정보]`는 담당자가 확인한 값만 기입 | `01_task_definition.md` 5장, `06` Q5 |
+| 가장 중요한 정보를 가장 앞에 | 템플릿 맨 위 `[핵심 조건]`, 긴 규정은 뒤, 마지막 줄 핵심 지시 반복 | `03_prompt_design.md` 3-1장, `06` Q6 |
+| 보너스 실행물 | 자동 검증 스크립트 + 샘플 3종 | `bonus/` |
 
 ## 주요 학습 내용
 
